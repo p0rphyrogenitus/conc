@@ -17,9 +17,9 @@ namespace conc {
     template <typename T> class SynchronousQueue {
     public:
         SynchronousQueue();
-        bool offer(const T &element, int32_t timeout = 0);
+        bool offer(const T &element, uint32_t timeout = 0);
         void put(const T &element);
-        std::optional<T> poll(int32_t timeout = 0);
+        std::optional<T> poll(uint32_t timeout = 0);
         T take();
     private:
         std::vector<T> elements;

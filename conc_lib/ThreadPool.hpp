@@ -8,6 +8,7 @@
 #include <queue>
 #include <semaphore>
 #include <thread>
+#include "data_struct/SynchronousQueue.hpp"
 
 
 namespace conc {
@@ -40,7 +41,7 @@ namespace conc {
 
         void shutdown(bool join) override;
         void shutdown_now(bool join) override;
-        void submit(const std::function<void ()> &job) override;
+        void submit(const std::function<void()> &job) override;
     private:
         static void run_thread(std::shared_ptr<FixedThreadPool_> &pool);
 
@@ -53,26 +54,28 @@ namespace conc {
         std::mutex tasks_mutex;
     };
 
-    conc::ThreadPool<FixedThreadPool_> make_fixed_thread_pool(uint16_t nthreads);
+    ThreadPool<FixedThreadPool_> make_fixed_thread_pool(uint16_t nthreads);
 
-    class CachedThreadPool_ : public ThreadPool_ {
+    class CachedThreadPool_ : public ThreadPool_, public std::enable_shared_from_this<CachedThreadPool_> {
     public:
-        friend std::shared_ptr<CachedThreadPool_> make_cached_thread_pool(uint16_t thread_timeout);
+        friend std::shared_ptr<CachedThreadPool_> make_cached_thread_pool(uint16_t thread_idle_timeout);
 
         ~CachedThreadPool_() override;
 
         void shutdown(bool join) override;
         void shutdown_now(bool join) override;
-        void submit(const std::function<void ()> &job) override;
+        void submit(const std::function<void()> &job) override;
     private:
-        static void run_thread(std::shared_ptr<CachedThreadPool_> &pool);
+        static void run_thread(std::shared_ptr<CachedThreadPool_> &pool, std::function<void()> &initial_job);
 
-        explicit CachedThreadPool_(uint16_t thread_timeout);
+        explicit CachedThreadPool_(uint16_t thread_idle_timeout);
 
-        uint16_t thread_timeout;
+        uint16_t thread_idle_timeout;
+        SynchronousQueue<std::function<void()>> job_queue;
+        std::mutex shutdown_or_thread_mod_mutex;
     };
 
-    conc::ThreadPool<CachedThreadPool_> make_cached_thread_pool(uint16_t thread_timeout);
+    ThreadPool<CachedThreadPool_> make_cached_thread_pool(uint16_t thread_idle_timeout);
 }
 
 #endif //CONC_THREAD_POOL_HPP

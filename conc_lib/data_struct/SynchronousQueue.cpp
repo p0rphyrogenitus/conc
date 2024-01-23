@@ -9,13 +9,13 @@
 template <typename T> conc::SynchronousQueue<T>::SynchronousQueue() : consumer_waiting(false) {
 }
 
-template <typename T> bool conc::SynchronousQueue<T>::offer(const T &element, int32_t timeout) {
+template <typename T> bool conc::SynchronousQueue<T>::offer(const T &element, uint32_t timeout) {
     {
         std::unique_lock<std::mutex> queue_lock(queue_mutex);
     }
     std::unique_lock<std::mutex> consumer_lock(consumer_mutex);
 
-    if (!consumer_waiting && (timeout <= 0 || !consumer_waiting_cv.wait_for(
+    if (!consumer_waiting && (timeout == 0 || !consumer_waiting_cv.wait_for(
             consumer_lock,
             std::chrono::milliseconds(timeout),
             [this] -> bool { return consumer_waiting; }))) {
@@ -46,8 +46,7 @@ template <typename T> void conc::SynchronousQueue<T>::put(const T &element) {
     enqueued_cv.notify_one();
 }
 
-
-template <typename T> std::optional<T> conc::SynchronousQueue<T>::poll(int32_t timeout) {
+template <typename T> std::optional<T> conc::SynchronousQueue<T>::poll(uint32_t timeout) {
     {
         std::unique_lock<std::mutex> consumer_lock(consumer_mutex);
         consumer_waiting = true;
@@ -55,11 +54,11 @@ template <typename T> std::optional<T> conc::SynchronousQueue<T>::poll(int32_t t
 
     std::unique_lock<std::mutex> queue_lock(queue_mutex);
     consumer_waiting_cv.notify_one();
-    if (elements.empty() && (timeout <= 0 || !enqueued_cv.wait_for(
+    if (elements.empty() && (timeout == 0 || !enqueued_cv.wait_for(
             queue_lock,
             std::chrono::milliseconds(timeout),
             [this] -> bool { return !elements.empty(); }))) {
-        return false;
+        return std::nullopt;
     }
 
     {

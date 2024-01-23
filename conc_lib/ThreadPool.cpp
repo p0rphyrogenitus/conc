@@ -27,7 +27,7 @@ bool conc::ThreadPool_::is_terminated() const {
  */
 
 conc::ThreadPool<conc::FixedThreadPool_> conc::make_fixed_thread_pool(uint16_t nthreads) {
-    conc::ThreadPool<conc::FixedThreadPool_> pool_ptr(new FixedThreadPool_(nthreads));
+    ThreadPool<FixedThreadPool_> pool_ptr(new FixedThreadPool_(nthreads));
 
     for (; nthreads > 0; --nthreads) {
         pool_ptr->threads.emplace_back([pool_ptr]() mutable -> void {
@@ -97,7 +97,7 @@ void conc::FixedThreadPool_::submit(const std::function<void()> &job) {
     runner_cv.notify_one();
 }
 
-void conc::FixedThreadPool_::run_thread(conc::ThreadPool<conc::FixedThreadPool_> &pool) {
+void conc::FixedThreadPool_::run_thread(ThreadPool<FixedThreadPool_> &pool) {
     while (true) {
         bool should_start_safe_shutdown;
         std::function<void()> job;
@@ -130,27 +130,84 @@ conc::FixedThreadPool_::FixedThreadPool_(uint16_t nthreads) : nthreads(nthreads)
  *****************************************************************************************************
  */
 
-conc::ThreadPool<conc::CachedThreadPool_> conc::make_cached_thread_pool(uint16_t thread_timeout) {
-    return conc::ThreadPool<conc::CachedThreadPool_>(new CachedThreadPool_(thread_timeout));
+conc::ThreadPool<conc::CachedThreadPool_> conc::make_cached_thread_pool(uint16_t thread_idle_timeout) {
+    return ThreadPool<CachedThreadPool_>(new CachedThreadPool_(thread_idle_timeout));
 }
 
 conc::CachedThreadPool_::~CachedThreadPool_() = default;
 
 void conc::CachedThreadPool_::shutdown(bool join) {
-    // TODO
+    shutdown_now(join);
 }
 
 void conc::CachedThreadPool_::shutdown_now(bool join) {
-    // TODO
+    {
+        std::lock_guard<std::mutex> lk(shutdown_or_thread_mod_mutex);
+        if (is_shutdown_) {
+            return;
+        }
+        is_safe_shutdown_started_ = is_shutdown_ = true;
+    }
+
+    for (std::thread &active_thread : threads) {
+        if (join) {
+            active_thread.join();
+        } else {
+            active_thread.detach();
+        }
+    }
+
+    is_terminated_ = join;
+    threads.clear();
 }
 
-void conc::CachedThreadPool_::submit(const std::function<void ()> &job) {
-    // TODO
+void conc::CachedThreadPool_::submit(const std::function<void()> &job) {
+    std::lock_guard<std::mutex> lk(shutdown_or_thread_mod_mutex);
+    if (is_shutdown_) {
+        return;
+    }
+
+    if (!job_queue.offer(job)) {
+        threads.emplace_back([pool_ptr = shared_from_this(), initial_job = job] mutable -> void {
+            CachedThreadPool_::run_thread(pool_ptr, initial_job);
+        });;
+    }
 }
 
-void conc::CachedThreadPool_::run_thread(std::shared_ptr<CachedThreadPool_> &pool) {
+void conc::CachedThreadPool_::run_thread(ThreadPool<CachedThreadPool_> &pool,
+                                         std::function<void()> &initial_job) {
+    std::optional<std::function<void()>> job = std::move(initial_job);
+    while (true) {
+        // job will actually always contain a value. See exit condition below.
+        job.value_or([]{})();
 
+        if ((job = pool->job_queue.poll(pool->thread_idle_timeout)) == std::nullopt) {
+            // Start new thread to safely erase this running thread, if appropriate. Immediately detach new thread.
+            std::thread([pool, thread_to_erase= std::this_thread::get_id()] -> void {
+                std::lock_guard<std::mutex> lk(pool->shutdown_or_thread_mod_mutex);
+
+                // If the pool is shut down, then the shutdown thread will do the erasing.
+                if (!pool->is_shutdown_) {
+                    auto thread_to_erase_it = std::find_if(
+                            pool->threads.begin(),
+                            pool->threads.end(),
+                            [thread_to_erase](const std::thread &thr) {
+                                return thr.get_id() == thread_to_erase;
+                            });
+                    if (thread_to_erase_it != pool->threads.end()) {
+                        // Whether we detach or join is irrelevant since we are immediately returning after detaching
+                        // this current thread (that is, the child-most thread). That said, join() more clearly
+                        // expresses that the thread of execution in question has completed its computation.
+                        thread_to_erase_it->join();
+                        pool->threads.erase(thread_to_erase_it);
+                    }
+                }
+            }).detach();
+
+            return;
+        }
+    }
 }
 
-conc::CachedThreadPool_::CachedThreadPool_(uint16_t thread_timeout) : thread_timeout(thread_timeout) {
+conc::CachedThreadPool_::CachedThreadPool_(uint16_t thread_idle_timeout) : thread_idle_timeout(thread_idle_timeout) {
 }
