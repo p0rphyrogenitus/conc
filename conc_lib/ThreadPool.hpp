@@ -8,7 +8,7 @@
 #include <queue>
 #include <semaphore>
 #include <thread>
-#include "data_struct/SynchronousQueue.hpp"
+#include "data_struct/BlockingQueue.hpp"
 
 
 namespace conc {

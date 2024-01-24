@@ -109,11 +109,14 @@ void conc::FixedThreadPool_::run_thread(ThreadPool<FixedThreadPool_> &pool) {
             if (pool->is_shutdown_) {
                 return;
             }
-            job = pool->task_queue.front();
+            job = std::move(pool->task_queue.front());
             pool->task_queue.pop();
             should_start_safe_shutdown = pool->is_safe_shutdown_started_ && pool->task_queue.empty();
         }
-        job();
+
+        try {
+            job();
+        } catch (...) {}
 
         if (should_start_safe_shutdown) {
             pool->safe_shutdown_cv.notify_all();
@@ -179,11 +182,13 @@ void conc::CachedThreadPool_::run_thread(ThreadPool<CachedThreadPool_> &pool,
     std::optional<std::function<void()>> job = std::move(initial_job);
     while (true) {
         // job will actually always contain a value. See exit condition below.
-        job.value_or([]{})();
+        try {
+            job.value_or([]{})();
+        } catch (...) {}
 
         if ((job = pool->job_queue.poll(pool->thread_idle_timeout)) == std::nullopt) {
             // Start new thread to safely erase this running thread, if appropriate. Immediately detach new thread.
-            std::thread([pool, thread_to_erase= std::this_thread::get_id()] -> void {
+            std::thread([pool, thread_to_erase = std::this_thread::get_id()] -> void {
                 std::lock_guard<std::mutex> lk(pool->shutdown_or_thread_mod_mutex);
 
                 // If the pool is shut down, then the shutdown thread will do the erasing.

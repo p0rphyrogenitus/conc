@@ -3,8 +3,27 @@
 //
 
 #include <chrono>
-#include "SynchronousQueue.hpp"
+#include "BlockingQueue.hpp"
 
+
+/*************************************************************************************************
+ ****************************************** BlockingQueue ****************************************
+ *************************************************************************************************
+ */
+
+template <typename T> bool conc::BlockingQueue<T>::offer(const T &element) {
+    return offer(element, 0);
+}
+
+template <typename T> std::optional<T> conc::BlockingQueue<T>::poll() {
+    return poll(0);
+}
+
+
+/****************************************************************************************************
+ ****************************************** SynchronousQueue ****************************************
+ ****************************************************************************************************
+ */
 
 template <typename T> conc::SynchronousQueue<T>::SynchronousQueue() : consumer_waiting(false) {
 }
