@@ -8,7 +8,7 @@
 #include <queue>
 #include <semaphore>
 #include <thread>
-#include "data_struct/BlockingQueue.hpp"
+#include "BlockingQueue.hpp"
 
 
 namespace conc {
@@ -30,8 +30,8 @@ namespace conc {
     };
 
 
-    template <typename T> concept IsThreadPool_ = std::is_base_of<ThreadPool_, T>::value;
-    template <IsThreadPool_ T = ThreadPool_> using ThreadPool = std::shared_ptr<T>;
+    template <typename DerivedPoolT> concept IsThreadPool_ = std::is_base_of<ThreadPool_, DerivedPoolT>::value;
+    template <IsThreadPool_ DerivedPoolT = ThreadPool_> using ThreadPool = std::shared_ptr<DerivedPoolT>;
 
     class FixedThreadPool_ : public ThreadPool_, public std::enable_shared_from_this<FixedThreadPool_> {
     public:

@@ -2,12 +2,14 @@ project(conc)
 
 set(HEADER_FILES
         ThreadPool.hpp
-        data_struct/BlockingQueue.hpp
+        BlockingQueue.hpp
+        Lock.hpp
 )
 
 set(SOURCE_FILES
         ThreadPool.cpp
-        data_struct/BlockingQueue.cpp
+        BlockingQueue.cpp
+        Lock.cpp
 )
 
 add_library(conc_lib STATIC ${SOURCE_FILES} ${HEADER_FILES})
