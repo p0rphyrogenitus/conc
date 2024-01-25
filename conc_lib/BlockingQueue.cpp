@@ -6,22 +6,6 @@
 #include "BlockingQueue.hpp"
 
 
-/*************************************************************************************************
- ****************************************** BlockingQueue ****************************************
- *************************************************************************************************
- */
-
-template<typename ElemT>
-bool conc::BlockingQueue<ElemT>::offer(const ElemT &element) {
-    return offer(element, 0);
-}
-
-template<typename ElemT>
-std::optional<ElemT> conc::BlockingQueue<ElemT>::poll() {
-    return poll(0);
-}
-
-
 /**************************************************************************************************
  ****************************************** BlockingQueue_ ****************************************
  **************************************************************************************************
@@ -43,6 +27,11 @@ bool conc::BlockingQueue_<ElemT, Size, LockT>::offer(const ElemT &element, uint3
     }
     not_empty_cv.notify_one();
     return true;
+}
+
+template<typename ElemT, uint32_t Size, conc::IsUniqueLock_ LockT>
+bool conc::BlockingQueue_<ElemT, Size, LockT>::offer(const ElemT &element) {
+    return offer(element, 0);
 }
 
 template<typename ElemT, uint32_t Size, conc::IsUniqueLock_ LockT>
@@ -77,6 +66,11 @@ std::optional<ElemT> conc::BlockingQueue_<ElemT, Size, LockT>::poll(uint32_t tim
     }
     not_full_cv.notify_one();
     return element;
+}
+
+template<typename ElemT, uint32_t Size, conc::IsUniqueLock_ LockT>
+std::optional<ElemT> conc::BlockingQueue_<ElemT, Size, LockT>::poll() {
+    return poll(0);
 }
 
 template<typename ElemT, uint32_t Size, conc::IsUniqueLock_ LockT>

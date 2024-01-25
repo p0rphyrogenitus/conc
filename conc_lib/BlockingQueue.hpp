@@ -12,22 +12,22 @@
 #include <queue>
 #include <thread>
 #include <vector>
-#include <Lock.hpp>
+#include "Lock.hpp"
 
 
 namespace conc {
     template<typename ElemT>
     class BlockingQueue {
     public:
-        virtual bool offer(const ElemT &element);
-
         virtual bool offer(const ElemT &element, uint32_t timeout) = 0;
+
+        virtual bool offer(const ElemT &element) = 0;
 
         virtual void put(const ElemT &element) = 0;
 
-        virtual std::optional<ElemT> poll();
-
         virtual std::optional<ElemT> poll(uint32_t timeout) = 0;
+
+        virtual std::optional<ElemT> poll() = 0;
 
         virtual ElemT take() = 0;
     };
@@ -40,9 +40,13 @@ namespace conc {
     public:
         bool offer(const ElemT &element, uint32_t timeout) override;
 
+        bool offer(const ElemT &element) override;
+
         void put(const ElemT &element) override;
 
         std::optional<ElemT> poll(uint32_t timeout) override;
+
+        std::optional<ElemT> poll() override;
 
         ElemT take() override;
 
