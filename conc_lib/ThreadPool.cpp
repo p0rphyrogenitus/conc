@@ -6,8 +6,6 @@
  ***********************************************************************************************
  */
 
-conc::ThreadPool_::~ThreadPool_() = default;
-
 bool conc::ThreadPool_::is_safe_shutdown_started() const {
     return is_safe_shutdown_started_;
 }
@@ -38,8 +36,6 @@ conc::ThreadPool<conc::FixedThreadPool_> conc::make_fixed_thread_pool(uint16_t n
     return pool_ptr;
 }
 
-conc::FixedThreadPool_::~FixedThreadPool_() = default;
-
 void conc::FixedThreadPool_::shutdown(bool join) {
     std::thread shutdown_thread([pool = shared_from_this()] {
         {
@@ -49,8 +45,8 @@ void conc::FixedThreadPool_::shutdown(bool join) {
             }
             pool->is_safe_shutdown_started_ = true;
             if (!pool->task_queue.empty()) {
-                pool->safe_shutdown_cv.wait(lk,[&pool] -> bool {
-                        return pool->task_queue.empty() && pool->is_safe_shutdown_started_;
+                pool->safe_shutdown_cv.wait(lk, [&pool] -> bool {
+                    return pool->task_queue.empty() && pool->is_safe_shutdown_started_;
                 });
             }
         }
@@ -73,7 +69,7 @@ void conc::FixedThreadPool_::shutdown_now(bool join) {
         is_shutdown_ = true;
     }
     runner_cv.notify_all();
-    for (std::thread &active_thread : threads) {
+    for (std::thread &active_thread: threads) {
         if (join) {
             active_thread.join();
         } else {
@@ -137,8 +133,6 @@ conc::ThreadPool<conc::CachedThreadPool_> conc::make_cached_thread_pool(uint16_t
     return ThreadPool<CachedThreadPool_>(new CachedThreadPool_(thread_idle_timeout));
 }
 
-conc::CachedThreadPool_::~CachedThreadPool_() = default;
-
 void conc::CachedThreadPool_::shutdown(bool join) {
     shutdown_now(join);
 }
@@ -152,7 +146,7 @@ void conc::CachedThreadPool_::shutdown_now(bool join) {
         is_safe_shutdown_started_ = is_shutdown_ = true;
     }
 
-    for (std::thread &active_thread : threads) {
+    for (std::thread &active_thread: threads) {
         if (join) {
             active_thread.join();
         } else {
@@ -173,7 +167,7 @@ void conc::CachedThreadPool_::submit(const std::function<void()> &job) {
     if (!job_queue.offer(job)) {
         threads.emplace_back([pool_ptr = shared_from_this(), initial_job = job] mutable -> void {
             CachedThreadPool_::run_thread(pool_ptr, initial_job);
-        });;
+        });
     }
 }
 
@@ -183,7 +177,7 @@ void conc::CachedThreadPool_::run_thread(ThreadPool<CachedThreadPool_> &pool,
     while (true) {
         // job will actually always contain a value. See exit condition below.
         try {
-            job.value_or([]{})();
+            job.value_or([] {})();
         } catch (...) {}
 
         if ((job = pool->job_queue.poll(pool->thread_idle_timeout)) == std::nullopt) {
