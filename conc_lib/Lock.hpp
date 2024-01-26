@@ -26,5 +26,6 @@ namespace conc {
     };
 }
 
+#include "Lock.cpp"
 
 #endif //CONC_DEV_LOCK_HPP

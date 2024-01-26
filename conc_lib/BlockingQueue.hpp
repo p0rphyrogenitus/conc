@@ -83,8 +83,7 @@ namespace conc {
     };
 
     template<typename ElemT, uint32_t Size>
-    class ThickBlockingQueue
-            : public BlockingQueue_<ElemT, Size, std::unique_lock<std::mutex>> {
+    class ThickBlockingQueue : public BlockingQueue_<ElemT, Size, std::unique_lock<std::mutex>> {
         static_assert(Size > 0, "Size must be positive");
     protected:
         bool is_full() override;
@@ -97,5 +96,6 @@ namespace conc {
     };
 }
 
+#include "BlockingQueue.cpp"
 
 #endif //CONC_DEV_BLOCKINGQUEUE_HPP
