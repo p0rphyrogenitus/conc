@@ -36,7 +36,7 @@ namespace conc {
     std::is_base_of<std::unique_lock<std::mutex>, DerivedLockT>::value;
 
     template<typename ElemT, uint32_t Size, IsUniqueLock_ LockT>
-    class BlockingQueue_ : public BlockingQueue<ElemT> {
+    class SimpleBlockingQueue_ : public BlockingQueue<ElemT> {
     public:
         bool offer(const ElemT &element, uint32_t timeout) override;
 
@@ -67,7 +67,7 @@ namespace conc {
     };
 
     template<typename ElemT>
-    class SynchronousQueue : public BlockingQueue_<ElemT, 0, LockWithHooks<std::mutex>> {
+    class SynchronousQueue : public SimpleBlockingQueue_<ElemT, 0, LockWithHooks<std::mutex>> {
     protected:
         bool is_full() override;
 
@@ -83,7 +83,7 @@ namespace conc {
     };
 
     template<typename ElemT, uint32_t Size>
-    class ThickBlockingQueue : public BlockingQueue_<ElemT, Size, std::unique_lock<std::mutex>> {
+    class ThickBlockingQueue : public SimpleBlockingQueue_<ElemT, Size, std::unique_lock<std::mutex>> {
         static_assert(Size > 0, "Size must be positive");
     protected:
         bool is_full() override;
@@ -93,6 +93,48 @@ namespace conc {
         std::unique_lock<std::mutex> lock_on_insert() override;
 
         std::unique_lock<std::mutex> lock_on_remove() override;
+    };
+
+    template<typename T> concept Delayable_ = requires(T t) {
+        { t.get_delay() } -> std::same_as<uint64_t>;
+    };
+
+    // Wraps elements submitted to a DelayQueue in order to convert relative time to absolute time, while preserving
+    // the item initially submitted to the queue
+    template<Delayable_ ElemT>
+    class DelayQueueElement_ {
+    public:
+        explicit DelayQueueElement_(const ElemT &inner);
+
+        DelayQueueElement_(const DelayQueueElement_ &other);
+
+        DelayQueueElement_(DelayQueueElement_ &&other) noexcept;
+
+        uint64_t get_delay();
+
+    private:
+        uint64_t delay;
+        const ElemT inner;
+    };
+
+    template<Delayable_ ElemT>
+    class DelayQueue : public BlockingQueue<ElemT> {
+    public:
+        bool offer(const ElemT &element, uint32_t timeout) override;
+
+        bool offer(const ElemT &element) override;
+
+        void put(const ElemT &element) override;
+
+        std::optional<ElemT> poll(uint32_t timeout) override;
+
+        std::optional<ElemT> poll() override;
+
+        ElemT take() override;
+
+    private:
+        std::priority_queue<DelayQueueElement_<ElemT>> queue;
+        std::mutex queue_mutex;
     };
 }
 
